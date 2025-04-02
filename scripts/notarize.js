@@ -1,32 +1,33 @@
-const { notarize } = require("electron-notarize");
-const { build } = require("../package.json");
+require("dotenv").config();
+const path = require("path");
 
 exports.default = async function notarizing(context) {
-  const { electronPlatformName, appOutDir } = context;
+  // Skip notarization in development mode
+  if (process.env.CSC_FORCE_SIGN === "false") {
+    console.log("Skipping notarization in development mode");
+    return;
+  }
 
-  // Only notarize on Mac
+  const { electronPlatformName, appOutDir } = context;
   if (electronPlatformName !== "darwin") {
     return;
   }
 
-  // Get app name from the build info
+  console.log("Notarizing macOS application...");
+
   const appName = context.packager.appInfo.productFilename;
-  const appBundleId = build.appId;
-
-  console.log(`Notarizing ${appName} with bundle identifier ${appBundleId}`);
-
-  // Environment variables should be set in your CI/CD pipeline or local environment
-  // export APPLE_ID=your.apple.id@example.com
-  // export APPLE_ID_PASSWORD=app-specific-password
-  // export TEAM_ID=your-team-id
+  const appPath = path.join(appOutDir, `${appName}.app`);
 
   try {
+    // Using dynamic import() for @electron/notarize
+    const { notarize } = await import("@electron/notarize");
+
     await notarize({
-      appBundleId,
-      appPath: `${appOutDir}/${appName}.app`,
+      tool: "notarytool",
+      appPath,
+      teamId: process.env.APPLE_TEAM_ID,
       appleId: process.env.APPLE_ID,
       appleIdPassword: process.env.APPLE_ID_PASSWORD,
-      teamId: process.env.TEAM_ID || "7X2UF4FZHC",
     });
     console.log(`Successfully notarized ${appName}`);
   } catch (error) {
