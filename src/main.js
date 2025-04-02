@@ -1,5 +1,13 @@
-const { app, BrowserWindow, ipcMain, screen } = require("electron");
+const { app, BrowserWindow, ipcMain, screen, dialog } = require("electron");
 const path = require("path");
+const { autoUpdater } = require("electron-updater");
+const log = require("electron-log");
+
+// Configure logging
+log.transports.file.level = "info";
+autoUpdater.logger = log;
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
 
 let mainWindow;
 let pinnedWindow = null;
@@ -27,8 +35,55 @@ function createWindow() {
   // mainWindow.webContents.openDevTools();
 }
 
+// Setup auto-updater events
+function setupAutoUpdater() {
+  // Check for updates immediately when app starts
+  autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+    log.error("Error checking for updates:", err);
+  });
+
+  // Set up a timer to check for updates every hour
+  setInterval(() => {
+    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
+      log.error("Error in periodic update check:", err);
+    });
+  }, 60 * 60 * 1000); // Check every hour
+
+  autoUpdater.on("update-available", (info) => {
+    log.info("Update available:", info);
+    dialog.showMessageBox({
+      type: "info",
+      title: "Update Available",
+      message: `A new version (${info.version}) of HelloCam is available. It will be downloaded in the background.`,
+      buttons: ["OK"],
+    });
+  });
+
+  autoUpdater.on("update-downloaded", (info) => {
+    log.info("Update downloaded:", info);
+    dialog
+      .showMessageBox({
+        type: "info",
+        title: "Update Ready",
+        message: `Version ${info.version} has been downloaded and will be installed when you quit the application.`,
+        buttons: ["Restart Now", "Later"],
+        defaultId: 0,
+      })
+      .then((result) => {
+        if (result.response === 0) {
+          autoUpdater.quitAndInstall(false, true);
+        }
+      });
+  });
+
+  autoUpdater.on("error", (err) => {
+    log.error("AutoUpdater error:", err);
+  });
+}
+
 app.whenReady().then(() => {
   createWindow();
+  setupAutoUpdater();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -40,6 +95,16 @@ app.whenReady().then(() => {
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
+  }
+});
+
+// Expose update functions to renderer process
+ipcMain.handle("check-for-updates", async () => {
+  try {
+    return await autoUpdater.checkForUpdatesAndNotify();
+  } catch (error) {
+    log.error("Error checking for updates:", error);
+    return { error: error.message };
   }
 });
 

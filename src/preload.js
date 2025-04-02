@@ -33,4 +33,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.removeAllListeners("set-zoom-area");
     };
   },
+
+  // Auto-update functionality
+  checkForUpdates: async () => ipcRenderer.invoke("check-for-updates"),
 });
