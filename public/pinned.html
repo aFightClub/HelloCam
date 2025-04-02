@@ -34,19 +34,65 @@
         width: 100%;
         height: 100%;
         object-fit: cover;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      }
+
+      canvas {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 5;
+        object-fit: cover;
       }
 
       /* Aspect Ratio Styles */
-      .widescreen-layout video {
+      .widescreen-layout video,
+      .widescreen-layout canvas {
         aspect-ratio: 16/9;
       }
 
-      .square-layout video {
+      .square-layout video,
+      .square-layout canvas {
         aspect-ratio: 1/1;
       }
 
-      .portrait-layout video {
+      .portrait-layout video,
+      .portrait-layout canvas {
         aspect-ratio: 9/16;
+      }
+
+      /* Close button */
+      .close-button {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        width: 25px;
+        height: 25px;
+        background: rgba(0, 0, 0, 0.5);
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-family: sans-serif;
+        font-size: 14px;
+        line-height: 1;
+        z-index: 100;
+        -webkit-app-region: no-drag;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+      }
+
+      .container:hover .close-button {
+        opacity: 1;
+      }
+
+      .close-button:hover {
+        background: rgba(255, 0, 0, 0.8);
+        transform: scale(1.1);
       }
 
       /* Video filter styles */
@@ -67,6 +113,8 @@
     <div class="container" id="container">
       <div class="webcam-wrapper" id="webcam-wrapper">
         <video id="webcam" autoplay playsinline></video>
+        <canvas id="crop-canvas"></canvas>
+        <div class="close-button" id="close-button">✕</div>
       </div>
     </div>
 
@@ -74,6 +122,17 @@
       document.addEventListener("DOMContentLoaded", () => {
         const container = document.getElementById("container");
         const webcamElement = document.getElementById("webcam");
+        const cropCanvas = document.getElementById("crop-canvas");
+        const closeButton = document.getElementById("close-button");
+        const ctx = cropCanvas.getContext("2d");
+
+        let cropData = null;
+        let currentStream = null;
+
+        // Close button functionality
+        closeButton.addEventListener("click", () => {
+          window.electronAPI.closePinnedWindow();
+        });
 
         // Listen for window configuration from main process
         window.electronAPI.onPinnedWindowConfig(async (config) => {
@@ -93,7 +152,13 @@
               borderRadius,
               borderWidth,
               borderColor,
+              cropData: receivedCropData,
             } = styleConfig;
+
+            // Store crop data if provided
+            if (receivedCropData) {
+              cropData = receivedCropData;
+            }
 
             // Apply width if specified
             // Use originalWidth which is the specified width before any layout adjustments
@@ -105,16 +170,17 @@
 
             // Apply filter if specified
             if (filter && filter !== "none") {
-              webcamElement.classList.add(`filter-${filter}`);
+              cropCanvas.classList.add(`filter-${filter}`);
             }
 
             // Apply border styles
             if (borderRadius) {
-              webcamElement.style.borderRadius = `${borderRadius}%`;
+              cropCanvas.style.borderRadius = `${borderRadius}%`;
+              webcamElement.style.opacity = "0"; // Hide video element since we're using canvas
             }
 
             if (borderWidth && borderColor) {
-              webcamElement.style.border = `${borderWidth}px solid ${borderColor}`;
+              cropCanvas.style.border = `${borderWidth}px solid ${borderColor}`;
             }
           }
 
@@ -129,15 +195,33 @@
             });
 
             webcamElement.srcObject = stream;
+            currentStream = stream;
 
             // Add error handling for video element
             webcamElement.onerror = (e) => {
               console.error("Video element error:", e);
             };
 
+            // When video metadata is loaded, set up canvas dimensions
+            webcamElement.onloadedmetadata = () => {
+              cropCanvas.width = webcamElement.videoWidth;
+              cropCanvas.height = webcamElement.videoHeight;
+
+              // If cropping, hide the actual video and use canvas instead
+              if (cropData) {
+                webcamElement.style.opacity = "0";
+                updateCroppedCanvas();
+              }
+            };
+
             // Add a play handler to confirm video is playing
             webcamElement.onplaying = () => {
               console.log("Webcam video is now playing in pinned window");
+
+              // Start updating the canvas if we have crop data
+              if (cropData) {
+                startCanvasUpdate();
+              }
             };
           } catch (err) {
             console.error("Error accessing camera in pinned window:", err);
@@ -159,6 +243,45 @@
             document.getElementById("webcam-wrapper").appendChild(errorDiv);
           }
         });
+
+        // Update the canvas with the cropped area
+        function updateCroppedCanvas() {
+          if (!currentStream || !cropData || webcamElement.readyState < 2)
+            return;
+
+          // Calculate the source dimensions
+          const sourceX = cropData.x * webcamElement.videoWidth;
+          const sourceY = cropData.y * webcamElement.videoHeight;
+          const sourceWidth = cropData.width * webcamElement.videoWidth;
+          const sourceHeight = cropData.height * webcamElement.videoHeight;
+
+          // Clear the canvas
+          ctx.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
+
+          // Set dimensions based on aspect ratio
+          cropCanvas.width = sourceWidth;
+          cropCanvas.height = sourceHeight;
+
+          // Draw the cropped region to the canvas
+          ctx.drawImage(
+            webcamElement,
+            sourceX,
+            sourceY,
+            sourceWidth,
+            sourceHeight,
+            0,
+            0,
+            cropCanvas.width,
+            cropCanvas.height
+          );
+
+          requestAnimationFrame(updateCroppedCanvas);
+        }
+
+        // Start canvas updates
+        function startCanvasUpdate() {
+          updateCroppedCanvas();
+        }
       });
     </script>
   </body>

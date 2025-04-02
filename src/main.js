@@ -6,8 +6,8 @@ let pinnedWindow = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1080,
+    height: 720,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -16,7 +16,8 @@ function createWindow() {
     frame: true,
     transparent: false,
     alwaysOnTop: false,
-    resizable: true,
+    resizable: false,
+    center: true,
   });
 
   mainWindow.loadFile(path.join(__dirname, "../public/index.html"));
@@ -53,7 +54,7 @@ ipcMain.handle("create-pinned-window", (event, options) => {
     pinnedWindow = null;
   }
 
-  const { shape, titleConfig, styleConfig } = options;
+  const { shape, styleConfig } = options;
 
   // Get custom width from styleConfig or use default
   let width =
@@ -61,20 +62,19 @@ ipcMain.handle("create-pinned-window", (event, options) => {
   let height = 0;
   let windowWidth = width; // Base window width (before adjustments)
 
-  // Set appropriate height based on layout
+  // Set appropriate height based on aspect ratio
   switch (shape) {
-    case "modern":
-      height = Math.round(width * 0.75); // 4:3 ratio
+    case "widescreen":
+      height = Math.round(width * (9 / 16)); // 16:9 ratio
       break;
-    case "compact":
-      height = width; // Square-ish for compact view
-      windowWidth = width + 120; // Add sidebar width for window size, content area stays at specified width
+    case "square":
+      height = width; // 1:1 ratio
       break;
-    case "cinematic":
-      height = Math.round(width * 0.6); // 16:9 ratio
+    case "portrait":
+      height = Math.round(width * (16 / 9)); // 9:16 ratio
       break;
     default:
-      height = Math.round(width * 0.75); // Default to 4:3
+      height = Math.round(width * (9 / 16)); // Default to 16:9
   }
 
   pinnedWindow = new BrowserWindow({
@@ -98,7 +98,6 @@ ipcMain.handle("create-pinned-window", (event, options) => {
   pinnedWindow.webContents.on("did-finish-load", () => {
     pinnedWindow.webContents.send("pinned-window-config", {
       shape,
-      titleConfig,
       styleConfig: {
         ...styleConfig,
         originalWidth: width, // Send original width before adjustments
@@ -106,45 +105,31 @@ ipcMain.handle("create-pinned-window", (event, options) => {
     });
   });
 
-  // Set appropriate window shape
-  switch (shape) {
-    case "modern":
-      pinnedWindow.setAspectRatio(windowWidth / height);
-      pinnedWindow.setShape([
-        {
-          x: 0,
-          y: 0,
-          width: windowWidth,
-          height,
-          radius: 8, // Rounded corners
-        },
-      ]);
-      break;
-    case "compact":
-      pinnedWindow.setAspectRatio(windowWidth / height);
-      pinnedWindow.setShape([
-        {
-          x: 0,
-          y: 0,
-          width: windowWidth,
-          height,
-          radius: 8, // Rounded corners
-        },
-      ]);
-      break;
-    case "cinematic":
-      pinnedWindow.setAspectRatio(windowWidth / height);
-      pinnedWindow.setShape([
-        {
-          x: 0,
-          y: 0,
-          width: windowWidth,
-          height,
-          radius: 8, // Rounded corners
-        },
-      ]);
-      break;
+  // Set appropriate window shape based on aspect ratio
+  pinnedWindow.setAspectRatio(windowWidth / height);
+
+  // Apply rounded corners based on border radius
+  let cornerRadius = 8;
+  if (styleConfig && styleConfig.borderRadius) {
+    // Convert percentage to pixels with a max of 20px
+    cornerRadius = Math.min(
+      Math.round(
+        (parseInt(styleConfig.borderRadius) / 100) *
+          Math.min(windowWidth, height)
+      ),
+      20
+    );
   }
+
+  pinnedWindow.setShape([
+    {
+      x: 0,
+      y: 0,
+      width: windowWidth,
+      height,
+      radius: cornerRadius,
+    },
+  ]);
 
   return { success: true };
 });
