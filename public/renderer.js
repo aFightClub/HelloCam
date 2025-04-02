@@ -30,6 +30,11 @@ document.addEventListener("DOMContentLoaded", () => {
     br: document.getElementById("handle-br"),
   };
 
+  // Create a background element for the crop preview
+  const cropBackground = document.createElement("div");
+  cropBackground.className = "crop-preview-background";
+  cropPreviewContainer.appendChild(cropBackground);
+
   // Aspect ratio buttons
   const shapeButtons = {
     widescreen: document.getElementById("shape-widescreen"),
@@ -76,6 +81,14 @@ document.addEventListener("DOMContentLoaded", () => {
   let initialCropY = 0;
   let initialCropWidth = 0;
   let initialCropHeight = 0;
+
+  // Normalized crop coordinates (0-1) for video
+  let normalizedCrop = {
+    x: 0.25,
+    y: 0.25,
+    width: 0.5,
+    height: 0.5,
+  };
 
   // Initialize UI based on inputs
   function initializeUI() {
@@ -205,6 +218,9 @@ document.addEventListener("DOMContentLoaded", () => {
         cropMask.style.top = `${newTop}px`;
         cropMask.style.transform = "none"; // Remove the transform for direct positioning
 
+        // Calculate normalized crop coordinates (0-1) based on crop container size
+        updateNormalizedCropCoordinates(newLeft, newTop, containerRect);
+
         // Redraw canvas with the cropped area
         drawCroppedAreaToCanvas();
       }
@@ -295,6 +311,9 @@ document.addEventListener("DOMContentLoaded", () => {
         cropMask.style.height = `${cropHeight}px`;
         cropMask.style.transform = "none"; // Remove transform for direct positioning
 
+        // Calculate normalized crop coordinates (0-1)
+        updateNormalizedCropCoordinates(newX, newY, containerRect);
+
         // Redraw canvas
         drawCroppedAreaToCanvas();
       }
@@ -312,6 +331,16 @@ document.addEventListener("DOMContentLoaded", () => {
         activeHandle = null;
       }
     });
+  }
+
+  function updateNormalizedCropCoordinates(x, y, containerRect) {
+    // Calculate normalized crop coordinates (0-1) based on crop container size
+    normalizedCrop = {
+      x: x / containerRect.width,
+      y: y / containerRect.height,
+      width: cropWidth / containerRect.width,
+      height: cropHeight / containerRect.height,
+    };
   }
 
   // Set up resize handle events
@@ -354,20 +383,44 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateCropMaskSize() {
     const containerRect = cropPreviewContainer.getBoundingClientRect();
 
-    // Calculate mask dimensions based on current aspect ratio
-    const aspectRatio = getCropAspectRatio();
+    // Get webcam's natural aspect ratio if available
+    let aspectRatio = getCropAspectRatio(); // Default from selected aspect ratio
+    if (videoElement.videoWidth && videoElement.videoHeight) {
+      // If webcam is active, use its natural aspect ratio for the crop mask
+      const naturalRatio = videoElement.videoWidth / videoElement.videoHeight;
 
-    // Default to 70% of container width
-    cropWidth = containerRect.width * 0.7;
+      // Calculate how the video fits in the container (maintain aspect ratio)
+      let videoDisplayWidth, videoDisplayHeight;
 
-    // But ensure height doesn't exceed container
-    const calculatedHeight = cropWidth / aspectRatio;
-    if (calculatedHeight > containerRect.height * 0.8) {
-      // If too tall, base on height instead
-      cropHeight = containerRect.height * 0.8;
-      cropWidth = cropHeight * aspectRatio;
+      if (naturalRatio > containerRect.width / containerRect.height) {
+        // Video is wider than container - width matches
+        videoDisplayWidth = containerRect.width;
+        videoDisplayHeight = videoDisplayWidth / naturalRatio;
+      } else {
+        // Video is taller than container - height matches
+        videoDisplayHeight = containerRect.height;
+        videoDisplayWidth = videoDisplayHeight * naturalRatio;
+      }
+
+      // Start with mask at 70% of the displayed video size
+      cropWidth = videoDisplayWidth * 0.7;
+      cropHeight = cropWidth / aspectRatio;
+
+      // Make sure crop height doesn't exceed the video height
+      if (cropHeight > videoDisplayHeight) {
+        cropHeight = videoDisplayHeight * 0.7;
+        cropWidth = cropHeight * aspectRatio;
+      }
     } else {
-      cropHeight = calculatedHeight;
+      // Fallback if video dimensions aren't available yet
+      cropWidth = containerRect.width * 0.7;
+      cropHeight = cropWidth / aspectRatio;
+
+      // Ensure height doesn't exceed container
+      if (cropHeight > containerRect.height * 0.8) {
+        cropHeight = containerRect.height * 0.8;
+        cropWidth = cropHeight * aspectRatio;
+      }
     }
 
     // Center the mask in the container
@@ -385,6 +438,9 @@ document.addEventListener("DOMContentLoaded", () => {
     cropMask.style.top = `${newTop}px`;
     cropMask.style.transform = "none"; // Remove default transform
 
+    // Update normalized coordinates
+    updateNormalizedCropCoordinates(newLeft, newTop, containerRect);
+
     // Apply border radius to mask to match preview
     const borderRadius = styleInputs.borderRadius.value;
     cropMask.style.borderRadius = `${borderRadius}%`;
@@ -394,33 +450,69 @@ document.addEventListener("DOMContentLoaded", () => {
   function drawCroppedAreaToCanvas() {
     if (!currentStream || videoElement.readyState < 2) return;
 
-    // Get relative positions
-    const videoRect = videoElement.getBoundingClientRect();
+    // Get video dimensions
+    const videoWidth = videoElement.videoWidth;
+    const videoHeight = videoElement.videoHeight;
 
-    // Calculate crop relative to video
-    const relX = cropX - videoRect.left;
-    const relY = cropY - videoRect.top;
+    // Calculate how the video fits in the crop container (similar to object-fit: contain)
+    const containerRect = cropPreviewContainer.getBoundingClientRect();
+    const containerRatio = containerRect.width / containerRect.height;
+    const videoRatio = videoWidth / videoHeight;
 
-    // Calculate the scale factors between video and display
-    const scaleX = videoElement.videoWidth / videoRect.width;
-    const scaleY = videoElement.videoHeight / videoRect.height;
+    let displayWidth, displayHeight, offsetX, offsetY;
 
-    // Calculate source coordinates (from video)
-    const sourceX = relX * scaleX;
-    const sourceY = relY * scaleY;
-    const sourceWidth = cropWidth * scaleX;
-    const sourceHeight = cropHeight * scaleY;
+    if (videoRatio > containerRatio) {
+      // Video is wider than container - width matches
+      displayWidth = containerRect.width;
+      displayHeight = displayWidth / videoRatio;
+      offsetX = 0;
+      offsetY = (containerRect.height - displayHeight) / 2;
+    } else {
+      // Video is taller than container - height matches
+      displayHeight = containerRect.height;
+      displayWidth = displayHeight * videoRatio;
+      offsetX = (containerRect.width - displayWidth) / 2;
+      offsetY = 0;
+    }
+
+    // Calculate crop position relative to the displayed video
+    const relativeX = (cropX - containerRect.left - offsetX) / displayWidth;
+    const relativeY = (cropY - containerRect.top - offsetY) / displayHeight;
+    const relativeWidth = cropWidth / displayWidth;
+    const relativeHeight = cropHeight / displayHeight;
+
+    // Calculate source coordinates in the actual video
+    const sourceX = Math.max(0, relativeX * videoWidth);
+    const sourceY = Math.max(0, relativeY * videoHeight);
+    const sourceWidth = Math.min(
+      relativeWidth * videoWidth,
+      videoWidth - sourceX
+    );
+    const sourceHeight = Math.min(
+      relativeHeight * videoHeight,
+      videoHeight - sourceY
+    );
+
+    // Update normalized crop data
+    normalizedCrop = {
+      x: relativeX,
+      y: relativeY,
+      width: relativeWidth,
+      height: relativeHeight,
+    };
 
     // Set canvas dimensions to match crop size
-    canvasElement.width = cropWidth;
-    canvasElement.height = cropHeight;
+    canvasElement.width = sourceWidth;
+    canvasElement.height = sourceHeight;
+
+    // Clear canvas
+    ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
     // Draw the cropped region to the canvas
-    ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
     ctx.drawImage(
       videoElement,
-      Math.max(0, sourceX),
-      Math.max(0, sourceY),
+      sourceX,
+      sourceY,
       sourceWidth,
       sourceHeight,
       0,
@@ -428,6 +520,43 @@ document.addEventListener("DOMContentLoaded", () => {
       canvasElement.width,
       canvasElement.height
     );
+
+    // Set the canvas size based on the aspect ratio and available space
+    const webcamRect = webcamWrapper.getBoundingClientRect();
+    const maxPreviewWidth = webcamRect.width * 0.9;
+    const maxPreviewHeight = webcamRect.height * 0.9;
+
+    // Determine the display size while maintaining aspect ratio
+    const previewRatio = canvasElement.width / canvasElement.height;
+
+    if (previewRatio > maxPreviewWidth / maxPreviewHeight) {
+      // Preview is wider than container
+      canvasElement.style.width = `${maxPreviewWidth}px`;
+      canvasElement.style.height = "auto";
+    } else {
+      // Preview is taller than container
+      canvasElement.style.height = `${maxPreviewHeight}px`;
+      canvasElement.style.width = "auto";
+    }
+  }
+
+  // Capture a frame from the video to display in crop preview
+  function captureVideoFrame() {
+    if (!videoElement || videoElement.readyState < 2) return null;
+
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = videoElement.videoWidth;
+    tempCanvas.height = videoElement.videoHeight;
+
+    const tempCtx = tempCanvas.getContext("2d");
+    tempCtx.drawImage(videoElement, 0, 0, tempCanvas.width, tempCanvas.height);
+
+    try {
+      return tempCanvas.toDataURL("image/jpeg", 0.7);
+    } catch (e) {
+      console.error("Error capturing video frame:", e);
+      return null;
+    }
   }
 
   // Stop the camera stream
@@ -449,6 +578,10 @@ document.addEventListener("DOMContentLoaded", () => {
       // Clear canvas
       ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
 
+      // Clear crop preview background
+      cropBackground.style.backgroundImage = "";
+      cropBackground.style.display = "none";
+
       console.log("Camera stopped");
     }
   }
@@ -462,13 +595,12 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // Get crop data as normalized coordinates (0-1) for the source video
-      const videoRect = videoElement.getBoundingClientRect();
+      // Use normalized crop coordinates
       const cropData = {
-        x: Math.max(0, (cropX - videoRect.left) / videoRect.width),
-        y: Math.max(0, (cropY - videoRect.top) / videoRect.height),
-        width: cropWidth / videoRect.width,
-        height: cropHeight / videoRect.height,
+        x: normalizedCrop.x,
+        y: normalizedCrop.y,
+        width: normalizedCrop.width,
+        height: normalizedCrop.height,
       };
 
       // Collect current configuration
@@ -555,29 +687,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Apply aspect ratio styles to elements
   function applyAspectRatio(shape) {
-    webcamSection.classList.remove(
-      "widescreen-layout",
-      "square-layout",
-      "portrait-layout"
-    );
+    document
+      .querySelector(".left-panel")
+      .classList.remove(
+        "widescreen-layout",
+        "square-layout",
+        "portrait-layout"
+      );
 
-    webcamSection.classList.add(`${shape}-layout`);
+    document.querySelector(".left-panel").classList.add(`${shape}-layout`);
 
-    // Reset width
-    canvasElement.style.width = `${currentWidth}px`;
-
-    // Apply aspect ratio
-    switch (shape) {
-      case "widescreen":
-        canvasElement.style.aspectRatio = "16/9";
-        break;
-      case "square":
-        canvasElement.style.aspectRatio = "1/1";
-        break;
-      case "portrait":
-        canvasElement.style.aspectRatio = "9/16";
-        break;
-    }
+    // Set current shape
+    currentShape = shape;
 
     // Update crop mask to match new aspect ratio
     updateCropMaskSize();
@@ -607,8 +728,7 @@ document.addEventListener("DOMContentLoaded", () => {
       videoElement.srcObject = stream;
       currentStream = stream;
 
-      // Make sure webcam wrapper is visible with proper size
-      webcamWrapper.style.display = "block";
+      // Make webcam element visible
       videoElement.style.opacity = "1";
 
       // Set buttons
@@ -622,22 +742,18 @@ document.addEventListener("DOMContentLoaded", () => {
         setTimeout(() => {
           videoElement.play();
 
-          // Set canvas dimensions based on video
-          canvasElement.width = videoElement.videoWidth || 640;
-          canvasElement.height = videoElement.videoHeight || 480;
-
-          // Apply current width
-          canvasElement.style.width = `${currentWidth}px`;
-
           // Apply current aspect ratio
           applyAspectRatio(currentShape);
 
           // Apply border styles
           updateBorderStyles();
 
-          // Make sure crop mask is showing
+          // Update crop mask position
           updateCropMaskSize();
           cropMask.style.display = "block";
+
+          // Update crop preview background
+          updateCropPreviewBackground();
 
           // Initial draw to canvas to show image
           drawCroppedAreaToCanvas();
@@ -680,11 +796,28 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Update the crop preview background
+  function updateCropPreviewBackground() {
+    if (!currentStream || videoElement.readyState < 2) return;
+
+    const videoUrl = captureVideoFrame();
+    if (videoUrl) {
+      cropBackground.style.backgroundImage = `url(${videoUrl})`;
+      cropBackground.style.display = "block";
+      cropBackground.style.opacity = "0.8"; // Make it visible but not too bright
+    }
+  }
+
   // Draw webcam to canvas
   function updateCanvas() {
     if (currentStream && videoElement.readyState >= 2) {
       // Draw the cropped area to canvas
       drawCroppedAreaToCanvas();
+
+      // Update crop preview background every second
+      if (Date.now() % 1000 < 50) {
+        updateCropPreviewBackground();
+      }
     }
     requestAnimationFrame(updateCanvas);
   }

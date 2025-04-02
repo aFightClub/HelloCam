@@ -29,7 +29,6 @@
         height: 720px;
         background: rgba(30, 30, 30, 0.6);
         backdrop-filter: blur(10px);
-        border-radius: 16px;
         box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
         border: 1px solid rgba(255, 255, 255, 0.1);
         overflow: hidden;
@@ -40,34 +39,40 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
+        padding: 10px;
+        gap: 10px;
+        -webkit-app-region: no-drag; /* Make left panel non-draggable */
       }
 
       .webcam-section {
-        height: 60%;
+        flex: 1;
         position: relative;
         background-color: #0c0c0e;
         border-radius: 8px;
         padding: 20px;
-        margin: 10px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         transition: padding 0.3s ease;
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
       }
 
       .crop-panel {
-        height: 40%;
+        flex: 1;
         position: relative;
         background-color: #0c0c0e;
         border-radius: 8px;
         padding: 20px;
-        margin: 0 10px 10px 10px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
       }
 
       .crop-controls-wrapper {
         display: flex;
-        height: calc(100% - 40px);
+        height: 100%;
+        position: relative;
       }
 
       .crop-preview-container {
@@ -76,6 +81,34 @@
         background-color: rgba(0, 0, 0, 0.3);
         border-radius: 8px;
         overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100%;
+      }
+
+      .crop-preview-background {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        margin: 0 auto;
+        opacity: 0.8;
+        z-index: 0;
+        background-size: contain;
+        background-position: center;
+        background-repeat: no-repeat;
+      }
+
+      /* Media background to show in crop panel */
+      .crop-preview-container::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #000;
+        z-index: -1;
       }
 
       .crop-instructions {
@@ -84,6 +117,8 @@
         font-size: 14px;
         line-height: 1.4;
         border-left: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        align-items: center;
       }
 
       .controls-section {
@@ -93,6 +128,16 @@
         backdrop-filter: blur(10px);
         border-left: 1px solid rgba(255, 255, 255, 0.1);
         z-index: 100;
+        -webkit-app-region: drag; /* Make right sidebar draggable */
+      }
+
+      /* Make interactive elements in the sidebar non-draggable */
+      .controls-section button,
+      .controls-section input,
+      .controls-section .radio-button,
+      .controls-section .slider-group,
+      .controls-section label {
+        -webkit-app-region: no-drag;
       }
 
       .section-title {
@@ -261,7 +306,7 @@
       .webcam-wrapper {
         position: relative;
         width: 100%;
-        height: calc(100% - 40px);
+        height: 100%;
         display: flex;
         justify-content: center;
         align-items: center;
@@ -280,12 +325,15 @@
 
       #webcam {
         position: absolute;
-        width: 100%;
+        width: auto;
         height: 100%;
-        object-fit: cover;
+        object-fit: contain;
+        margin: 0 auto;
+        left: 0;
+        right: 0;
         opacity: 0;
         transition: opacity 0.5s ease;
-        z-index: 1;
+        z-index: -1; /* Hide behind the canvas */
       }
 
       #preview {
@@ -293,23 +341,26 @@
         background-color: rgba(0, 0, 0, 0.8);
         object-fit: contain;
         max-width: 100%;
+        max-height: 100%;
         border-radius: 0;
         transition: all 0.3s ease;
         z-index: 2;
+        margin: 0 auto;
+        display: block;
       }
 
       /* Widescreen Layout */
-      .widescreen-layout {
+      .widescreen-layout .crop-preview-container {
         aspect-ratio: 16/9;
       }
 
       /* Square Layout */
-      .square-layout {
+      .square-layout .crop-preview-container {
         aspect-ratio: 1/1;
       }
 
       /* Portrait Layout */
-      .portrait-layout {
+      .portrait-layout .crop-preview-container {
         aspect-ratio: 9/16;
       }
 
@@ -390,7 +441,6 @@
       <div class="left-panel">
         <!-- Webcam Preview Panel (Top) -->
         <div class="webcam-section">
-          <div class="section-title">Webcam Preview</div>
           <div class="webcam-wrapper">
             <video id="webcam" playsinline autoplay muted></video>
             <canvas id="preview"></canvas>
@@ -399,7 +449,6 @@
 
         <!-- Crop Controls Panel (Bottom) -->
         <div class="crop-panel">
-          <div class="section-title">Crop Controls</div>
           <div class="crop-controls-wrapper">
             <div class="crop-preview-container">
               <div id="crop-mask" class="crop-mask">
@@ -409,10 +458,6 @@
                 <div id="handle-bl" class="crop-handle bl"></div>
                 <div id="handle-br" class="crop-handle br"></div>
               </div>
-            </div>
-            <div class="crop-instructions">
-              Select the area of your webcam to display by dragging the frame or
-              using the corner handles to resize.
             </div>
           </div>
         </div>
