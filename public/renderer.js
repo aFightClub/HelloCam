@@ -30,10 +30,8 @@ document.addEventListener("DOMContentLoaded", () => {
     br: document.getElementById("handle-br"),
   };
 
-  // Create a background element for the crop preview
-  const cropBackground = document.createElement("div");
-  cropBackground.className = "crop-preview-background";
-  cropPreviewContainer.appendChild(cropBackground);
+  // Get reference to the crop video element
+  const cropVideo = document.getElementById("crop-video");
 
   // Aspect ratio buttons
   const shapeButtons = {
@@ -540,25 +538,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Capture a frame from the video to display in crop preview
-  function captureVideoFrame() {
-    if (!videoElement || videoElement.readyState < 2) return null;
-
-    const tempCanvas = document.createElement("canvas");
-    tempCanvas.width = videoElement.videoWidth;
-    tempCanvas.height = videoElement.videoHeight;
-
-    const tempCtx = tempCanvas.getContext("2d");
-    tempCtx.drawImage(videoElement, 0, 0, tempCanvas.width, tempCanvas.height);
-
-    try {
-      return tempCanvas.toDataURL("image/jpeg", 0.7);
-    } catch (e) {
-      console.error("Error capturing video frame:", e);
-      return null;
-    }
-  }
-
   // Stop the camera stream
   function stopCamera() {
     if (currentStream) {
@@ -566,8 +545,9 @@ document.addEventListener("DOMContentLoaded", () => {
       currentStream.getTracks().forEach((track) => track.stop());
       currentStream = null;
 
-      // Clear video source
+      // Clear video sources
       videoElement.srcObject = null;
+      cropVideo.srcObject = null;
 
       // Reset buttons
       startButton.textContent = "Start";
@@ -577,10 +557,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Clear canvas
       ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-
-      // Clear crop preview background
-      cropBackground.style.backgroundImage = "";
-      cropBackground.style.display = "none";
 
       console.log("Camera stopped");
     }
@@ -726,10 +702,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // If we get here, we have camera access
       videoElement.srcObject = stream;
+      cropVideo.srcObject = stream; // Use the same stream for both video elements
       currentStream = stream;
 
-      // Make webcam element visible
+      // Make webcam elements visible
       videoElement.style.opacity = "1";
+      cropVideo.style.opacity = "1";
 
       // Set buttons
       startButton.textContent = "Restart";
@@ -741,6 +719,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // Wait a bit for the video to stabilize
         setTimeout(() => {
           videoElement.play();
+          cropVideo.play();
 
           // Apply current aspect ratio
           applyAspectRatio(currentShape);
@@ -751,9 +730,6 @@ document.addEventListener("DOMContentLoaded", () => {
           // Update crop mask position
           updateCropMaskSize();
           cropMask.style.display = "block";
-
-          // Update crop preview background
-          updateCropPreviewBackground();
 
           // Initial draw to canvas to show image
           drawCroppedAreaToCanvas();
@@ -796,28 +772,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  // Update the crop preview background
-  function updateCropPreviewBackground() {
-    if (!currentStream || videoElement.readyState < 2) return;
-
-    const videoUrl = captureVideoFrame();
-    if (videoUrl) {
-      cropBackground.style.backgroundImage = `url(${videoUrl})`;
-      cropBackground.style.display = "block";
-      cropBackground.style.opacity = "0.8"; // Make it visible but not too bright
-    }
-  }
-
   // Draw webcam to canvas
   function updateCanvas() {
     if (currentStream && videoElement.readyState >= 2) {
       // Draw the cropped area to canvas
       drawCroppedAreaToCanvas();
-
-      // Update crop preview background every second
-      if (Date.now() % 1000 < 50) {
-        updateCropPreviewBackground();
-      }
     }
     requestAnimationFrame(updateCanvas);
   }

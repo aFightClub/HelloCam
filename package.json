@@ -1,7 +1,7 @@
 {
-  "name": "fancywebcam",
+  "name": "HelloCam",
   "version": "1.0.0",
-  "description": "Fancy Webcam Electron App",
+  "description": "HelloCam Electron App",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
@@ -16,8 +16,8 @@
     "electron-builder": "^24.9.1"
   },
   "build": {
-    "appId": "com.fancywebcam.app",
-    "productName": "FancyWebcam",
+    "appId": "com.hellocam.app",
+    "productName": "HelloCam",
     "directories": {
       "output": "dist"
     },
