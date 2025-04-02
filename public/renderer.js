@@ -20,7 +20,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Crop mask elements
   const cropMask = document.getElementById("crop-mask");
-  const cropContainer = document.querySelector(".crop-container");
+  const cropPreviewContainer = document.querySelector(
+    ".crop-preview-container"
+  );
   const handles = {
     tl: document.getElementById("handle-tl"),
     tr: document.getElementById("handle-tr"),
@@ -143,6 +145,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // Set up resize handle functionality
     setupHandleResizing();
 
+    // Initial display of crop mask
+    updateCropMaskSize();
+    cropMask.style.display = "block";
+
     // Set initial aspect ratio
     applyAspectRatio("widescreen");
   }
@@ -177,25 +183,27 @@ document.addEventListener("DOMContentLoaded", () => {
         const deltaY = e.clientY - dragStartY;
 
         // Update crop position
-        cropX = initialCropX + deltaX;
-        cropY = initialCropY + deltaY;
+        const containerRect = cropPreviewContainer.getBoundingClientRect();
 
-        // Ensure the crop area stays within the bounds
-        const webcamRect = webcamSection.getBoundingClientRect();
-
-        // Calculate bounds
-        const minX = webcamRect.left;
-        const maxX = webcamRect.right - cropWidth;
-        const minY = webcamRect.top;
-        const maxY = webcamRect.bottom - cropHeight;
+        // Calculate new position relative to the crop container
+        let newLeft = initialCropX + deltaX - containerRect.left;
+        let newTop = initialCropY + deltaY - containerRect.top;
 
         // Constrain to bounds
-        cropX = Math.max(minX, Math.min(maxX, cropX));
-        cropY = Math.max(minY, Math.min(maxY, cropY));
+        const maxLeft = containerRect.width - cropWidth;
+        const maxTop = containerRect.height - cropHeight;
 
-        // Update position
-        cropMask.style.left = `${cropX - webcamRect.left}px`;
-        cropMask.style.top = `${cropY - webcamRect.top}px`;
+        newLeft = Math.max(0, Math.min(maxLeft, newLeft));
+        newTop = Math.max(0, Math.min(maxTop, newTop));
+
+        // Store absolute position for calculations
+        cropX = newLeft + containerRect.left;
+        cropY = newTop + containerRect.top;
+
+        // Update position relative to container
+        cropMask.style.left = `${newLeft}px`;
+        cropMask.style.top = `${newTop}px`;
+        cropMask.style.transform = "none"; // Remove the transform for direct positioning
 
         // Redraw canvas with the cropped area
         drawCroppedAreaToCanvas();
@@ -203,10 +211,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Handle resizing with corner handles
       if (isResizing && activeHandle) {
-        const webcamRect = webcamSection.getBoundingClientRect();
+        const containerRect = cropPreviewContainer.getBoundingClientRect();
         const aspectRatio = getCropAspectRatio();
 
         let newWidth, newHeight, newX, newY;
+
+        // Calculate position relative to container
+        const relativeInitialX = initialCropX - containerRect.left;
+        const relativeInitialY = initialCropY - containerRect.top;
 
         switch (activeHandle) {
           case "tl": // Top left
@@ -215,13 +227,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Apply size constraints
             newWidth = Math.min(
-              Math.max(100, newWidth), // Min width 100px
-              initialCropX + initialCropWidth - webcamRect.left // Don't go beyond right edge
+              Math.max(50, newWidth), // Min width 50px
+              relativeInitialX + initialCropWidth // Don't go beyond right edge
             );
             newHeight = newWidth / aspectRatio;
 
-            newX = initialCropX + initialCropWidth - newWidth;
-            newY = initialCropY + initialCropHeight - newHeight;
+            newX = relativeInitialX + initialCropWidth - newWidth;
+            newY = relativeInitialY + initialCropHeight - newHeight;
             break;
 
           case "tr": // Top right
@@ -230,13 +242,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Apply size constraints
             newWidth = Math.min(
-              Math.max(100, newWidth), // Min width 100px
-              webcamRect.right - initialCropX // Don't go beyond right edge
+              Math.max(50, newWidth), // Min width 50px
+              containerRect.width - relativeInitialX // Don't go beyond right edge
             );
             newHeight = newWidth / aspectRatio;
 
-            newX = initialCropX;
-            newY = initialCropY + initialCropHeight - newHeight;
+            newX = relativeInitialX;
+            newY = relativeInitialY + initialCropHeight - newHeight;
             break;
 
           case "bl": // Bottom left
@@ -245,13 +257,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Apply size constraints
             newWidth = Math.min(
-              Math.max(100, newWidth), // Min width 100px
-              initialCropX + initialCropWidth - webcamRect.left // Don't go beyond right edge
+              Math.max(50, newWidth), // Min width 50px
+              relativeInitialX + initialCropWidth // Don't go beyond right edge
             );
             newHeight = newWidth / aspectRatio;
 
-            newX = initialCropX + initialCropWidth - newWidth;
-            newY = initialCropY;
+            newX = relativeInitialX + initialCropWidth - newWidth;
+            newY = relativeInitialY;
             break;
 
           case "br": // Bottom right
@@ -260,27 +272,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Apply size constraints
             newWidth = Math.min(
-              Math.max(100, newWidth), // Min width 100px
-              webcamRect.right - initialCropX // Don't go beyond right edge
+              Math.max(50, newWidth), // Min width 50px
+              containerRect.width - relativeInitialX // Don't go beyond right edge
             );
             newHeight = newWidth / aspectRatio;
 
-            newX = initialCropX;
-            newY = initialCropY;
+            newX = relativeInitialX;
+            newY = relativeInitialY;
             break;
         }
 
-        // Update crop dimensions
-        cropX = newX;
-        cropY = newY;
+        // Update crop dimensions (relative to container)
+        cropX = newX + containerRect.left;
+        cropY = newY + containerRect.top;
         cropWidth = newWidth;
         cropHeight = newHeight;
 
-        // Update mask
-        cropMask.style.left = `${cropX - webcamRect.left}px`;
-        cropMask.style.top = `${cropY - webcamRect.top}px`;
+        // Update mask position and size
+        cropMask.style.left = `${newX}px`;
+        cropMask.style.top = `${newY}px`;
         cropMask.style.width = `${cropWidth}px`;
         cropMask.style.height = `${cropHeight}px`;
+        cropMask.style.transform = "none"; // Remove transform for direct positioning
 
         // Redraw canvas
         drawCroppedAreaToCanvas();
@@ -339,40 +352,38 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Update crop mask size based on aspect ratio
   function updateCropMaskSize() {
-    const webcamRect = webcamSection.getBoundingClientRect();
-    const canvasRect = canvasElement.getBoundingClientRect();
+    const containerRect = cropPreviewContainer.getBoundingClientRect();
 
     // Calculate mask dimensions based on current aspect ratio
-    switch (currentShape) {
-      case "widescreen":
-        cropWidth = Math.min(canvasRect.width, webcamRect.width - 40);
-        cropHeight = cropWidth * (9 / 16); // 16:9
-        break;
-      case "square":
-        cropWidth = Math.min(
-          canvasRect.width,
-          canvasRect.height,
-          webcamRect.width - 40,
-          webcamRect.height - 40
-        );
-        cropHeight = cropWidth; // 1:1
-        break;
-      case "portrait":
-        cropHeight = Math.min(canvasRect.height, webcamRect.height - 40);
-        cropWidth = cropHeight * (9 / 16); // 9:16
-        break;
+    const aspectRatio = getCropAspectRatio();
+
+    // Default to 70% of container width
+    cropWidth = containerRect.width * 0.7;
+
+    // But ensure height doesn't exceed container
+    const calculatedHeight = cropWidth / aspectRatio;
+    if (calculatedHeight > containerRect.height * 0.8) {
+      // If too tall, base on height instead
+      cropHeight = containerRect.height * 0.8;
+      cropWidth = cropHeight * aspectRatio;
+    } else {
+      cropHeight = calculatedHeight;
     }
 
-    // Center the mask initially
-    cropX = webcamRect.left + (webcamRect.width - cropWidth) / 2;
-    cropY = webcamRect.top + (webcamRect.height - cropHeight) / 2;
+    // Center the mask in the container
+    const newLeft = (containerRect.width - cropWidth) / 2;
+    const newTop = (containerRect.height - cropHeight) / 2;
 
-    // Apply to element
+    // Store absolute position for calculations
+    cropX = newLeft + containerRect.left;
+    cropY = newTop + containerRect.top;
+
+    // Apply to element (relative to container)
     cropMask.style.width = `${cropWidth}px`;
     cropMask.style.height = `${cropHeight}px`;
-    cropMask.style.left = `${cropX - webcamRect.left}px`;
-    cropMask.style.top = `${cropY - webcamRect.top}px`;
-    cropMask.style.display = "block";
+    cropMask.style.left = `${newLeft}px`;
+    cropMask.style.top = `${newTop}px`;
+    cropMask.style.transform = "none"; // Remove default transform
 
     // Apply border radius to mask to match preview
     const borderRadius = styleInputs.borderRadius.value;
@@ -384,7 +395,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!currentStream || videoElement.readyState < 2) return;
 
     // Get relative positions
-    const webcamRect = webcamSection.getBoundingClientRect();
     const videoRect = videoElement.getBoundingClientRect();
 
     // Calculate crop relative to video
@@ -438,9 +448,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Clear canvas
       ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-
-      // Hide crop mask
-      cropMask.style.display = "none";
 
       console.log("Camera stopped");
     }
@@ -528,7 +535,7 @@ document.addEventListener("DOMContentLoaded", () => {
     canvasElement.style.border = `${borderWidth}px solid ${borderColor}`;
 
     // Update crop mask border radius
-    if (cropMask.style.display === "block") {
+    if (cropMask) {
       cropMask.style.borderRadius = `${borderRadius}%`;
     }
   }
@@ -572,11 +579,9 @@ document.addEventListener("DOMContentLoaded", () => {
         break;
     }
 
-    // Update crop mask if camera is active
-    if (currentStream && videoElement.readyState >= 2) {
-      updateCropMaskSize();
-      drawCroppedAreaToCanvas();
-    }
+    // Update crop mask to match new aspect ratio
+    updateCropMaskSize();
+    drawCroppedAreaToCanvas();
   }
 
   // Start the webcam
@@ -630,8 +635,9 @@ document.addEventListener("DOMContentLoaded", () => {
           // Apply border styles
           updateBorderStyles();
 
-          // Show crop mask
+          // Make sure crop mask is showing
           updateCropMaskSize();
+          cropMask.style.display = "block";
 
           // Initial draw to canvas to show image
           drawCroppedAreaToCanvas();
@@ -677,29 +683,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // Draw webcam to canvas
   function updateCanvas() {
     if (currentStream && videoElement.readyState >= 2) {
-      // Draw the cropped area to the canvas
-      if (cropMask.style.display === "block") {
-        drawCroppedAreaToCanvas();
-      } else {
-        // Otherwise, draw the full video frame
-        canvasElement.width = videoElement.videoWidth || 640;
-        canvasElement.height = videoElement.videoHeight || 480;
-
-        // Ensure canvas stays within bounds
-        if (canvasElement.width > webcamSection.clientWidth) {
-          const aspectRatio = canvasElement.width / canvasElement.height;
-          canvasElement.width = webcamSection.clientWidth - 40;
-          canvasElement.height = canvasElement.width / aspectRatio;
-        }
-
-        ctx.drawImage(
-          videoElement,
-          0,
-          0,
-          canvasElement.width,
-          canvasElement.height
-        );
-      }
+      // Draw the cropped area to canvas
+      drawCroppedAreaToCanvas();
     }
     requestAnimationFrame(updateCanvas);
   }
