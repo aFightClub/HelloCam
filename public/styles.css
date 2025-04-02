@@ -1,0 +1,410 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  background-color: #1e1e2e;
+  color: #cdd6f4;
+  height: 100vh;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+h1 {
+  text-align: center;
+  margin-bottom: 2rem;
+  color: #89b4fa;
+}
+
+h3 {
+  color: #89b4fa;
+  margin-bottom: 0.8rem;
+}
+
+#app {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  justify-content: space-between;
+}
+
+/* Left side - Controls container */
+.controls-container {
+  flex: 1;
+  min-width: 320px;
+  max-width: 400px;
+  background-color: #313244;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Right side - Webcam container */
+.webcam-container {
+  flex: 2;
+  min-width: 320px;
+  max-width: 800px;
+  background-color: #313244;
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.webcam-wrapper {
+  position: relative;
+  overflow: hidden;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.settings-section {
+  margin-bottom: 1.5rem;
+}
+
+video,
+canvas {
+  width: 100%;
+  height: auto;
+  background-color: #181825;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.main-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  margin-bottom: 1.5rem;
+}
+
+.main-controls button {
+  width: 100%;
+  padding: 0.8rem;
+}
+
+button {
+  background-color: #89b4fa;
+  color: #1e1e2e;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+button:hover {
+  background-color: #b4befe;
+}
+
+button:disabled {
+  background-color: #6c7086;
+  cursor: not-allowed;
+}
+
+.shape-controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.shape-btn {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+}
+
+.shape-btn.active {
+  background-color: #cba6f7;
+}
+
+.input-group {
+  margin-bottom: 0.8rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.input-group label {
+  margin-bottom: 0.3rem;
+  font-size: 0.9rem;
+}
+
+.input-group input[type="text"] {
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #45475a;
+  background-color: #1e1e2e;
+  color: #cdd6f4;
+  font-size: 0.9rem;
+}
+
+.input-group input[type="color"] {
+  height: 2rem;
+  border: none;
+  border-radius: 4px;
+  background-color: transparent;
+}
+
+.input-group input[type="range"] {
+  height: 2rem;
+}
+
+.zoom-controls {
+  margin-top: 1rem;
+}
+
+.selection-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  cursor: crosshair;
+  z-index: 1000;
+}
+
+.selection-box {
+  position: absolute;
+  border: 2px dashed #89b4fa;
+  background-color: rgba(137, 180, 250, 0.2);
+  pointer-events: none;
+}
+
+/* Circle Layout */
+.circle-layout .webcam-wrapper,
+.circle-layout #webcam,
+.circle-layout #preview {
+  border-radius: 50%;
+}
+
+/* Square Layout */
+.square-layout .webcam-wrapper,
+.square-layout #webcam,
+.square-layout #preview {
+  aspect-ratio: 1/1;
+  border-radius: 0;
+}
+
+/* Rounded Layout */
+.rounded-layout .webcam-wrapper,
+.rounded-layout #webcam,
+.rounded-layout #preview {
+  border-radius: 20px;
+}
+
+@media (max-width: 768px) {
+  #app {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .controls-container,
+  .webcam-container {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+/* Tab System */
+.tabs {
+  display: flex;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid #45475a;
+}
+
+.tab-button {
+  flex: 1;
+  background-color: transparent;
+  color: #cdd6f4;
+  border: none;
+  padding: 0.6rem 0;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom: 2px solid transparent;
+}
+
+.tab-button:hover {
+  background-color: rgba(180, 190, 254, 0.1);
+}
+
+.tab-button.active {
+  background-color: rgba(180, 190, 254, 0.2);
+  border-bottom: 2px solid #89b4fa;
+  color: #89b4fa;
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* Adjustable preview */
+#preview {
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* Font selector */
+select {
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #45475a;
+  background-color: #1e1e2e;
+  color: #cdd6f4;
+  font-size: 0.9rem;
+  width: 100%;
+}
+
+/* Window width display */
+#window-width-value,
+#border-radius-value,
+#border-width-value {
+  display: inline-block;
+  margin-left: 0.5rem;
+  font-size: 0.9rem;
+  color: #cdd6f4;
+}
+
+/* Layout Preview */
+.layout-preview {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.layout-preview-item {
+  width: 100%;
+  height: 100px;
+  background-color: #1e1e2e;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: all 0.3s ease;
+  position: relative;
+  display: flex;
+  margin-bottom: 1rem;
+}
+
+.layout-preview-item:hover {
+  opacity: 1;
+  border-color: #89b4fa;
+}
+
+.layout-preview-item.active {
+  opacity: 1;
+  border-color: #cba6f7;
+}
+
+/* Widescreen layout preview (16:9) */
+#preview-widescreen {
+  flex-direction: column;
+}
+
+#preview-widescreen .preview-camera {
+  width: 100%;
+  height: 100%;
+  background-color: rgba(203, 166, 247, 0.2);
+  aspect-ratio: 16/9;
+}
+
+/* Square layout preview (1:1) */
+#preview-square {
+  flex-direction: column;
+}
+
+#preview-square .preview-camera-square {
+  width: 100%;
+  height: 100%;
+  background-color: rgba(203, 166, 247, 0.2);
+  aspect-ratio: 1/1;
+}
+
+/* Portrait layout preview (9:16) */
+#preview-portrait {
+  flex-direction: column;
+}
+
+#preview-portrait .preview-camera-portrait {
+  width: 100%;
+  height: 100%;
+  background-color: rgba(203, 166, 247, 0.2);
+  aspect-ratio: 9/16;
+}
+
+/* Aspect ratio styles */
+.widescreen-layout #preview {
+  aspect-ratio: 16/9;
+}
+
+.square-layout #preview {
+  aspect-ratio: 1/1;
+}
+
+.portrait-layout #preview {
+  aspect-ratio: 9/16;
+}
+
+/* Adjustable preview */
+#preview {
+  width: 400px;
+  margin: 0 auto;
+  display: block;
+}
+
+.webcam-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e1e2e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #45475a;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6c7086;
+}
+
+/* Video filter styles */
+.filter-grayscale {
+  filter: grayscale(100%);
+}
+
+.filter-sepia {
+  filter: sepia(100%);
+}
+
+.filter-invert {
+  filter: invert(100%);
+}

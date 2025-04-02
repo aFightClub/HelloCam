@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fancy Webcam</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        overflow: hidden;
+        background-color: transparent;
+        -webkit-app-region: drag; /* Make entire window draggable */
+      }
+
+      .container {
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        margin: 0 auto;
+      }
+
+      .webcam-wrapper {
+        position: relative;
+        flex: 1;
+        overflow: hidden;
+      }
+
+      video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      /* Aspect Ratio Styles */
+      .widescreen-layout video {
+        aspect-ratio: 16/9;
+      }
+
+      .square-layout video {
+        aspect-ratio: 1/1;
+      }
+
+      .portrait-layout video {
+        aspect-ratio: 9/16;
+      }
+
+      /* Video filter styles */
+      .filter-grayscale {
+        filter: grayscale(100%);
+      }
+
+      .filter-sepia {
+        filter: sepia(100%);
+      }
+
+      .filter-invert {
+        filter: invert(100%);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container" id="container">
+      <div class="webcam-wrapper" id="webcam-wrapper">
+        <video id="webcam" autoplay playsinline></video>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const container = document.getElementById("container");
+        const webcamElement = document.getElementById("webcam");
+
+        // Listen for window configuration from main process
+        window.electronAPI.onPinnedWindowConfig(async (config) => {
+          const { shape, styleConfig } = config;
+
+          // Apply aspect ratio
+          if (shape) {
+            container.classList.add(`${shape}-layout`);
+          }
+
+          // Apply styles
+          if (styleConfig) {
+            const {
+              width,
+              originalWidth,
+              filter,
+              borderRadius,
+              borderWidth,
+              borderColor,
+            } = styleConfig;
+
+            // Apply width if specified
+            // Use originalWidth which is the specified width before any layout adjustments
+            const actualWidth = originalWidth || width;
+            if (actualWidth) {
+              container.style.width = `${actualWidth}px`;
+              container.style.margin = "0 auto";
+            }
+
+            // Apply filter if specified
+            if (filter && filter !== "none") {
+              webcamElement.classList.add(`filter-${filter}`);
+            }
+
+            // Apply border styles
+            if (borderRadius) {
+              webcamElement.style.borderRadius = `${borderRadius}%`;
+            }
+
+            if (borderWidth && borderColor) {
+              webcamElement.style.border = `${borderWidth}px solid ${borderColor}`;
+            }
+          }
+
+          // Start the webcam
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+              },
+              audio: false,
+            });
+
+            webcamElement.srcObject = stream;
+
+            // Add error handling for video element
+            webcamElement.onerror = (e) => {
+              console.error("Video element error:", e);
+            };
+
+            // Add a play handler to confirm video is playing
+            webcamElement.onplaying = () => {
+              console.log("Webcam video is now playing in pinned window");
+            };
+          } catch (err) {
+            console.error("Error accessing camera in pinned window:", err);
+
+            // Create an error message element
+            const errorDiv = document.createElement("div");
+            errorDiv.style.position = "absolute";
+            errorDiv.style.top = "50%";
+            errorDiv.style.left = "50%";
+            errorDiv.style.transform = "translate(-50%, -50%)";
+            errorDiv.style.backgroundColor = "rgba(0,0,0,0.7)";
+            errorDiv.style.color = "white";
+            errorDiv.style.padding = "20px";
+            errorDiv.style.borderRadius = "10px";
+            errorDiv.style.textAlign = "center";
+            errorDiv.textContent =
+              "Could not access camera. Please restart the main app.";
+
+            document.getElementById("webcam-wrapper").appendChild(errorDiv);
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

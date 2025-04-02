@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fancy Webcam</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
+        background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
+        color: #f0f0f0;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+
+      .app-container {
+        display: flex;
+        width: 90%;
+        max-width: 1000px;
+        height: 80vh;
+        max-height: 700px;
+        background: rgba(30, 30, 30, 0.6);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        overflow: hidden;
+      }
+
+      .webcam-section {
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 1rem;
+      }
+
+      .controls-section {
+        width: 280px;
+        padding: 1.5rem;
+        background: rgba(20, 20, 20, 0.7);
+        backdrop-filter: blur(10px);
+        border-left: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .section-title {
+        font-size: 1.1rem;
+        font-weight: 500;
+        margin-bottom: 1rem;
+        opacity: 0.9;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 0.5rem;
+      }
+
+      .control-group {
+        margin-bottom: 1.5rem;
+      }
+
+      .button-group {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }
+
+      button {
+        background: rgba(60, 60, 60, 0.5);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(5px);
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        flex: 1;
+      }
+
+      button:hover {
+        background: rgba(80, 80, 80, 0.7);
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .radio-group {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }
+
+      .radio-button {
+        flex: 1;
+        text-align: center;
+        padding: 0.4rem;
+        border-radius: 6px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 0.85rem;
+      }
+
+      .radio-button.active {
+        background: rgba(100, 100, 100, 0.7);
+        border-color: rgba(255, 255, 255, 0.2);
+      }
+
+      .slider-group {
+        margin-bottom: 0.8rem;
+      }
+
+      .slider-group label {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.3rem;
+        font-size: 0.85rem;
+        opacity: 0.9;
+      }
+
+      .slider-group label span {
+        opacity: 0.8;
+      }
+
+      input[type="range"] {
+        width: 100%;
+        height: 5px;
+        -webkit-appearance: none;
+        appearance: none;
+        background: rgba(60, 60, 60, 0.5);
+        border-radius: 5px;
+        outline: none;
+      }
+
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.8);
+        cursor: pointer;
+      }
+
+      input[type="color"] {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 30px;
+        border: none;
+        border-radius: 6px;
+        background: transparent;
+        cursor: pointer;
+      }
+
+      canvas {
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+      }
+
+      .webcam-wrapper {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-container">
+      <div class="webcam-section">
+        <div class="webcam-wrapper">
+          <video id="webcam" autoplay playsinline></video>
+        </div>
+        <canvas id="preview"></canvas>
+      </div>
+
+      <div class="controls-section">
+        <div class="control-group">
+          <div class="section-title">Camera Controls</div>
+          <div class="button-group">
+            <button id="start-btn">Start Camera</button>
+            <button id="end-btn" disabled>Stop</button>
+          </div>
+          <button id="pin-btn" disabled>Pin to Desktop</button>
+          <button id="unpin-btn" disabled style="display: none">Unpin</button>
+        </div>
+
+        <div class="control-group">
+          <div class="section-title">Aspect Ratio</div>
+          <div class="radio-group">
+            <div id="shape-widescreen" class="radio-button active">16:9</div>
+            <div id="shape-square" class="radio-button">1:1</div>
+            <div id="shape-portrait" class="radio-button">9:16</div>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <div class="section-title">Styling</div>
+          <div class="slider-group">
+            <label>
+              Window Width
+              <span id="window-width-value">400px</span>
+            </label>
+            <input
+              type="range"
+              id="window-width"
+              min="300"
+              max="800"
+              step="10"
+              value="400"
+            />
+          </div>
+
+          <div class="slider-group">
+            <label>
+              Border Radius
+              <span id="border-radius-value">0%</span>
+            </label>
+            <input
+              type="range"
+              id="border-radius"
+              min="0"
+              max="50"
+              step="1"
+              value="0"
+            />
+          </div>
+
+          <div class="slider-group">
+            <label>
+              Border Width
+              <span id="border-width-value">0px</span>
+            </label>
+            <input
+              type="range"
+              id="border-width"
+              min="0"
+              max="20"
+              step="1"
+              value="0"
+            />
+          </div>
+
+          <div class="slider-group">
+            <label>Border Color</label>
+            <input type="color" id="border-color" value="#ffffff" />
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="renderer.js"></script>
+  </body>
+</html>

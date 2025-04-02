@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zoom View</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background-color: transparent;
+      }
+
+      #zoom-container {
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-radius: 150px;
+        overflow: hidden;
+      }
+
+      #zoom-view {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="zoom-container">
+      <canvas id="zoom-view"></canvas>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        const zoomCanvas = document.getElementById("zoom-view");
+        const ctx = zoomCanvas.getContext("2d");
+
+        // Set canvas size to window size
+        zoomCanvas.width = window.innerWidth;
+        zoomCanvas.height = window.innerHeight;
+
+        // Listen for zoom area data from main process
+        window.electronAPI.onSetZoomArea((data) => {
+          const { x, y, width, height, scaleFactor } = data;
+
+          // Create a video element for screen capture
+          const video = document.createElement("video");
+          video.autoplay = true;
+
+          // Use navigator.mediaDevices.getDisplayMedia to capture the screen
+          navigator.mediaDevices
+            .getDisplayMedia({
+              video: {
+                cursor: "never",
+                displaySurface: "monitor",
+              },
+            })
+            .then((stream) => {
+              video.srcObject = stream;
+
+              // When video metadata is loaded, we can start drawing
+              video.onloadedmetadata = () => {
+                // Calculate the scaling factor for zooming
+                const targetWidth = zoomCanvas.width;
+                const targetHeight = zoomCanvas.height;
+                const zoomFactor = 2; // Zoom magnification
+
+                function drawZoomedArea() {
+                  // Calculate source and destination rectangles
+                  const sx = x * scaleFactor;
+                  const sy = y * scaleFactor;
+                  const sWidth = width * scaleFactor;
+                  const sHeight = height * scaleFactor;
+
+                  const aspectRatio = sWidth / sHeight;
+
+                  let dWidth, dHeight;
+                  if (targetWidth / targetHeight > aspectRatio) {
+                    dHeight = targetHeight;
+                    dWidth = dHeight * aspectRatio;
+                  } else {
+                    dWidth = targetWidth;
+                    dHeight = dWidth / aspectRatio;
+                  }
+
+                  // Clear canvas
+                  ctx.clearRect(0, 0, targetWidth, targetHeight);
+
+                  // Draw the zoomed area
+                  ctx.drawImage(
+                    video,
+                    sx,
+                    sy,
+                    sWidth,
+                    sHeight,
+                    (targetWidth - dWidth) / 2,
+                    (targetHeight - dHeight) / 2,
+                    dWidth,
+                    dHeight
+                  );
+
+                  // Continue drawing for each animation frame
+                  requestAnimationFrame(drawZoomedArea);
+                }
+
+                // Start drawing
+                drawZoomedArea();
+              };
+            })
+            .catch((err) => {
+              console.error("Error accessing display media:", err);
+            });
+        });
+      });
+    </script>
+  </body>
+</html>
